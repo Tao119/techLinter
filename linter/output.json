@@ -1,0 +1,38 @@
+[
+  {
+    "severity": "Error",
+    "message": "The type or namespace name 'unknown' does not exist in the namespace 'System' (are you missing an assembly reference?)",
+    "line": 3,
+    "column": 14
+  },
+  {
+    "severity": "Warning",
+    "message": "The variable 'unused' is assigned but its value is never used",
+    "line": 13,
+    "column": 15
+  },
+  {
+    "severity": "Hidden",
+    "message": "Unnecessary using directive.",
+    "line": 3,
+    "column": 1
+  },
+  {
+    "severity": "Hidden",
+    "message": "Unnecessary using directive.",
+    "line": 2,
+    "column": 1
+  },
+  {
+    "severity": "Info",
+    "message": "Magic number detected: 13 used in context",
+    "line": 14,
+    "column": 29
+  },
+  {
+    "severity": "Info",
+    "message": "Magic number detected: 15 used in context",
+    "line": 18,
+    "column": 20
+  }
+]
