@@ -1,125 +1,107 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using CSharpLinter;
+﻿using Microsoft.Build.Construction;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Newtonsoft.Json;
 
 namespace CSharpLinter
 {
     class Program
     {
-        static void Main(string[] args)
+        static void Main()
         {
-            string code = Console.In.ReadToEnd();
-            // @"
-            // using System;
-            // class MyProgram
-            // {
-            //     public static void Main(string[] args)
-            //     {
-            //         int vari = 42;
-            //         for (var i = 0; i < 13; i++){
-            //             Console.WriteLine('a');
-            //         }
-            //         Console.WriteLine(vari);
-            //     }
-            // }";
+            string codePath = Console.In.ReadToEnd().Trim();
+            string code = File.ReadAllText(codePath);
 
             SyntaxTree tree = CSharpSyntaxTree.ParseText(code);
-            var rootNode = tree.GetRoot();
-            var usings = rootNode.DescendantNodes().OfType<UsingDirectiveSyntax>().ToList();
-            string? runtimePath = Path.GetDirectoryName(typeof(object).Assembly.Location);
+            var issues = new List<Issue>();
 
-            var issues = new List<object>();
-
-            var codeReferences = new List<MetadataReference>(
-                [
-                    MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                    MetadataReference.CreateFromFile(
-                        Path.Combine(runtimePath, "System.Console.dll")
-                    ),
-                    MetadataReference.CreateFromFile(
-                        Path.Combine(runtimePath, "System.Runtime.dll")
-                    ),
-                ]
-            );
-
-            foreach (var usingDirective in usings)
+            string projectFilePath = FindCsprojPath(Path.GetDirectoryName(codePath)!);
+            if (projectFilePath == null)
             {
-                string namespaceName = usingDirective.Name.ToString();
-                string assemblyPath = Path.Combine(runtimePath, $"{namespaceName}.dll");
-
-                if (File.Exists(assemblyPath)) // ファイルが存在するか確認
-                {
-                    codeReferences.Add(MetadataReference.CreateFromFile(assemblyPath));
-                }
+                Console.WriteLine("No .csproj file found.");
+                return;
             }
 
+            var codeReferences = LoadReferencesFromProject(projectFilePath);
             var compilation = CSharpCompilation.Create(
                 "MyCompilation",
                 syntaxTrees: new[] { tree },
                 references: codeReferences
             );
 
-            var model = compilation.GetSemanticModel(tree);
-            var diagnostics = compilation.GetDiagnostics();
+            AnalizeCodes.AnalyzeDiagnostics(compilation, issues);
 
-            // コンパイルエラーと警告の処理
-            foreach (var diagnostic in diagnostics)
+            MagicNumberDetection.DetectMagicNumbers(tree, issues);
+
+            NamingConventionDetection.DetectNamingConventions(tree, issues);
+
+            string json = JsonConvert.SerializeObject(issues, Formatting.Indented);
+            Console.WriteLine(json);
+        }
+
+        static string FindCsprojPath(string directoryPath)
+        {
+            while (directoryPath != null)
             {
-                var lineSpan = diagnostic.Location.GetLineSpan().StartLinePosition;
-                issues.Add(
-                    new
-                    {
-                        severity = diagnostic.Severity.ToString(),
-                        message = diagnostic.GetMessage(),
-                        line = lineSpan.Line + 1,
-                        column = lineSpan.Character + 1
-                    }
-                );
+                var projectFiles = Directory.GetFiles(directoryPath, "*.csproj");
+                if (projectFiles.Length > 0)
+                    return projectFiles[0];
+
+                directoryPath = Directory.GetParent(directoryPath)?.FullName!;
             }
 
-            //マジックナンバー
-            issues.AddRange(MagicNumberDetection.DetectMagicNumbers(tree));
+            return null!;
+        }
 
-            // パブリックメソッドのXMLコメントの確認
-            var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>();
-            foreach (var method in methods)
+        static List<MetadataReference> LoadReferencesFromProject(string projectFilePath)
+        {
+            var references = new List<MetadataReference>();
+            var projectRoot = ProjectRootElement.Open(projectFilePath);
+
+            foreach (var item in projectRoot.Items)
             {
-                if (
-                    method.Modifiers.Any(SyntaxKind.PublicKeyword)
-                    && !method
-                        .GetLeadingTrivia()
-                        .Any(tr =>
-                            tr.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
-                            || tr.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia)
-                        )
-                )
+                if (item.ItemType == "Reference" || item.ItemType == "PackageReference")
                 {
-                    var lineSpan = method.GetLocation().GetLineSpan().StartLinePosition;
-                    issues.Add(
-                        new
+                    var hintPath = item.Metadata.FirstOrDefault(m => m.Name == "HintPath")?.Value;
+                    if (hintPath != null)
+                    {
+                        string fullPath = Path.GetFullPath(
+                            hintPath,
+                            Path.GetDirectoryName(projectFilePath)!
+                        );
+                        if (File.Exists(fullPath))
                         {
-                            severity = "Warning",
-                            message = $"Public method '{method.Identifier.Text}' is missing XML documentation comments.",
-                            line = lineSpan.Line + 1,
-                            column = lineSpan.Character + 1
+                            references.Add(MetadataReference.CreateFromFile(fullPath));
                         }
-                    );
+                    }
+                }
+            }
+            string unityAssembliesPath = Path.Combine(
+                Path.GetDirectoryName(projectFilePath)!,
+                "Library",
+                "ScriptAssemblies"
+            );
+            if (Directory.Exists(unityAssembliesPath))
+            {
+                foreach (var dllPath in Directory.GetFiles(unityAssembliesPath, "*.dll"))
+                {
+                    references.Add(MetadataReference.CreateFromFile(dllPath));
                 }
             }
 
-            // JSON形式で結果を出力
-            string json = JsonConvert.SerializeObject(issues, Formatting.Indented);
-            Console.WriteLine(json);
+            return references;
         }
     }
 
     public class Issue
     {
-        public string? Description { get; set; }
+        public string? Severity { get; set; }
+        public string? Message { get; set; }
+        public int Line { get; set; }
+        public int EndLine { get; set; }
+        public int Column { get; set; }
+        public int EndColumn { get; set; }
+        public string Description =>
+            $"{Severity}: {Message} (Line: {Line}, Column: {Column} to Line: {EndLine}, Column: {EndColumn})";
     }
 }

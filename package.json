@@ -1,21 +1,23 @@
 {
-  "name": "techlinter",
-  "displayName": "techLinter",
-  "description": "tech linter",
+  "name": "tech-linter",
+  "displayName": "My Extension",
+  "description": "",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.88.0"
+    "vscode": "^1.79.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onCommand:extension.runLinter"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "techlinter.helloWorld",
-        "title": "Hello World"
+        "command": "extension.runLinter",
+        "title": "run linter"
       }
     ]
   },

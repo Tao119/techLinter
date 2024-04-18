@@ -1,26 +1,82 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import * as childProcess from 'child_process';
+import * as path from 'path';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+const severity: { [_: string]: vscode.DiagnosticSeverity } = {
+	"Info": vscode.DiagnosticSeverity.Information,
+	"Error": vscode.DiagnosticSeverity.Error,
+	"Warning": vscode.DiagnosticSeverity.Warning,
+	"Hint": vscode.DiagnosticSeverity.Hint
+};
+
+type Issue = {
+	Severity?: string,
+	Message?: string,
+	Line: number,
+	EndLine: number,
+	Column: number,
+	EndColumn: number
+}
+
 export function activate(context: vscode.ExtensionContext) {
+	const diagnosticsCollection = vscode.languages.createDiagnosticCollection('linter');
+	context.subscriptions.push(diagnosticsCollection);
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "techlinter" is now active!');
+	let disposable = vscode.commands.registerCommand('extension.runLinter', async () => {
+		const editor = vscode.window.activeTextEditor;
+		if (!editor) {
+			vscode.window.showErrorMessage("No file is open.");
+			return;
+		}
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('techlinter.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from techLinter!');
+		const filePath = editor.document.fileName;
+		if (!filePath) {
+			vscode.window.showErrorMessage("No file is open.");
+			return;
+		}
+
+		const pythonCommand = getPythonCommand();
+		const pythonPath = path.join(__dirname, '../linter/main.py');
+		const command = `${pythonCommand} "${pythonPath}" "${filePath}"`;
+
+		childProcess.exec(command, (error, stdout, stderr) => {
+			if (error) {
+				vscode.window.showErrorMessage(`Error: ${stderr}`);
+				return;
+			}
+
+			try {
+				const lintResults: Issue[] = JSON.parse(stdout);
+
+				const diagnostics: vscode.Diagnostic[] = lintResults.map((result) => {
+					const range = new vscode.Range(
+						new vscode.Position(result.Line - 1, result.Column - 1),
+						new vscode.Position(result.EndLine - 1, result.EndColumn - 1)
+					);
+					console.log(result);
+
+					return new vscode.Diagnostic(
+						range,
+						`${result.Message} ${result.Message ? "(from tech linter)" : ""}`,
+						severity[result.Severity ?? vscode.DiagnosticSeverity.Information]
+					);
+				});
+
+				diagnosticsCollection.set(editor.document.uri, diagnostics);
+				vscode.window.showInformationMessage("Linting completed.");
+			} catch (e) {
+				vscode.window.showErrorMessage(`Failed to parse lint results: ${e}`);
+			}
+		});
+
 	});
 
 	context.subscriptions.push(disposable);
 }
 
-// This method is called when your extension is deactivated
-export function deactivate() {}
+function getPythonCommand(): string {
+	return 'python3';
+}
+
+export function deactivate() {
+}

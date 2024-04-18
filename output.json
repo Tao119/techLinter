@@ -1,0 +1,8 @@
+[
+  {
+    "severity": "Info",
+    "message": "Magic number detected: 15 used in context",
+    "line": 11,
+    "column": 20
+  }
+]
