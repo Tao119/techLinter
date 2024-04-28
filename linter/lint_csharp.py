@@ -22,6 +22,9 @@ def lint_csharp(code_path, ur_id):
             print(f"Error: {stderr}", file=sys.stderr)
             return None
 
+        if (stdout.strip() == "err"):
+            return "err"
+
         return json.loads(stdout)
 
     except Exception as e:

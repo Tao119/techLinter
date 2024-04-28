@@ -72,6 +72,7 @@ export function activate(context: vscode.ExtensionContext) {
 				vscode.window.showErrorMessage(`Error: ${stderr}`);
 				return;
 			}
+			console.log("stdout");
 			console.log(stdout);
 
 			try {
