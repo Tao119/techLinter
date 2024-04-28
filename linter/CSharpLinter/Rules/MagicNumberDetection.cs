@@ -35,7 +35,8 @@ namespace CSharpLinter
                         new Issue
                         {
                             Severity = "Info",
-                            Message = $"{value} という数値が直接使用されています。定義し直しましょう。",
+                            Message =
+                                $"{value}という値が直接使用されているね！これだけだと意味が分かりにくいからこの値に具体的な名前を付ける定数を定義して、その定数を使用するようにするとプログラムの可読性上がるよ！",
                             Line = lineSpan.Line + 1,
                             EndLine = endLineSpan.Line + 1,
                             Column = lineSpan.Character + 1,

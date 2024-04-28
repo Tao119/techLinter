@@ -1,4 +1,3 @@
-// MagicNumberDetection.cs
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -12,7 +11,7 @@ namespace CSharpLinter
         {
             foreach (var diag in compilation.GetDiagnostics())
             {
-                if (!diag.Descriptor.Id.Equals("CS5001"))
+                if (!diag.Descriptor.Id.Equals("CS5001") && !diag.Descriptor.Id.Equals("CS0436"))
                 {
                     var lineSpan = diag.Location.GetLineSpan().StartLinePosition;
                     var endLineSpan = diag.Location.GetLineSpan().EndLinePosition;

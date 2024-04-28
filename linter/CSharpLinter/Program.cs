@@ -7,10 +7,27 @@ namespace CSharpLinter
 {
     class Program
     {
-        static void Main()
+        static async Task Main(string[] args)
         {
-            string codePath = Console.In.ReadToEnd().Trim();
-            string code = File.ReadAllText(codePath);
+            if (args.Length < 2)
+            {
+                Console.WriteLine("Usage: dotnet run <codePath> <userId>");
+                return;
+            }
+
+            string codePath = args[0];
+            if (!File.Exists(codePath))
+            {
+                Console.WriteLine($"Error: File not found - {codePath}");
+                return;
+            }
+
+            string code = await File.ReadAllTextAsync(codePath);
+            if (!int.TryParse(args[1], out int ur_id))
+            {
+                Console.WriteLine("Error: Invalid user ID");
+                return;
+            }
 
             SyntaxTree tree = CSharpSyntaxTree.ParseText(code);
             var issues = new List<Issue>();
@@ -31,9 +48,22 @@ namespace CSharpLinter
 
             AnalizeCodes.AnalyzeDiagnostics(compilation, issues);
 
+            if (issues.ToArray().Length > 0)
+            {
+                Console.WriteLine("err");
+                return;
+            }
+            NamingConventionAnalyzer.AnalyzeClassNames(tree, codePath, issues);
+
             MagicNumberDetection.DetectMagicNumbers(tree, issues);
 
             NamingConventionDetection.DetectNamingConventions(tree, issues);
+
+            // NestingDepthDetector.DetectNestingDepth(tree, issues);
+
+            // UnusedVariableDetector.DetectUnusedVariables(tree, issues, compilation);
+
+            await ChatGptFeedbackFetcher.FetchFeedbackAndAddToIssues(tree, issues, ur_id);
 
             string json = JsonConvert.SerializeObject(issues, Formatting.Indented);
             Console.WriteLine(json);
@@ -95,11 +125,22 @@ namespace CSharpLinter
 
     public class Issue
     {
+        [JsonProperty("severity")]
         public string? Severity { get; set; }
+
+        [JsonProperty("message")]
         public string? Message { get; set; }
+
+        [JsonProperty("line")]
         public int Line { get; set; }
+
+        [JsonProperty("end_line")]
         public int EndLine { get; set; }
+
+        [JsonProperty("column")]
         public int Column { get; set; }
+
+        [JsonProperty("end_column")]
         public int EndColumn { get; set; }
         public string Description =>
             $"{Severity}: {Message} (Line: {Line}, Column: {Column} to Line: {EndLine}, Column: {EndColumn})";

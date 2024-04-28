@@ -12,41 +12,63 @@ namespace CSharpLinter
         {
             var root = tree.GetRoot();
 
-            // Variables
             foreach (var variable in root.DescendantNodes().OfType<VariableDeclaratorSyntax>())
             {
-                CheckNameConventions(
+                CheckCamelCase(
                     variable.Identifier.ValueText,
-                    "Variable",
+                    "変数",
                     variable.Identifier.GetLocation(),
                     issues
                 );
             }
 
-            // Methods
             foreach (var method in root.DescendantNodes().OfType<MethodDeclarationSyntax>())
             {
-                CheckNameConventions(
+                CheckPascalCase(
                     method.Identifier.ValueText,
-                    "Method",
+                    "メソッド",
                     method.Identifier.GetLocation(),
                     issues
                 );
             }
 
-            // Classes
             foreach (var classDecl in root.DescendantNodes().OfType<ClassDeclarationSyntax>())
             {
-                CheckNameConventions(
+                CheckPascalCase(
                     classDecl.Identifier.ValueText,
-                    "Class",
+                    "クラス",
                     classDecl.Identifier.GetLocation(),
                     issues
                 );
             }
         }
 
-        private static void CheckNameConventions(
+        private static void CheckCamelCase(
+            string name,
+            string type,
+            Location location,
+            List<Issue> issues
+        )
+        {
+            if (!Regex.IsMatch(name, "^[a-z]+[a-zA-Z0-9]*$"))
+            {
+                var lineSpan = location.GetLineSpan();
+                issues.Add(
+                    new Issue
+                    {
+                        Severity = "Warning",
+                        Message =
+                            $"{name}という{type}名がキャメルケースで記述されていないね！{type}は小文字から始めて、単語の区切りを大文字にするのが一般的だよ！。",
+                        Line = lineSpan.StartLinePosition.Line + 1,
+                        EndLine = lineSpan.EndLinePosition.Line + 1,
+                        Column = lineSpan.StartLinePosition.Character + 1,
+                        EndColumn = lineSpan.EndLinePosition.Character + 1
+                    }
+                );
+            }
+        }
+
+        private static void CheckPascalCase(
             string name,
             string type,
             Location location,
@@ -60,7 +82,8 @@ namespace CSharpLinter
                     new Issue
                     {
                         Severity = "Warning",
-                        Message = $"{name} という{type}名はパスカルケースであるべきです。",
+                        Message =
+                            $"{name}という{type}名がパスカルケースで記述されてないね！{type}は大文字から始めて、単語の区切りも大文字にするのが一般的だよ！",
                         Line = lineSpan.StartLinePosition.Line + 1,
                         EndLine = lineSpan.EndLinePosition.Line + 1,
                         Column = lineSpan.StartLinePosition.Character + 1,
